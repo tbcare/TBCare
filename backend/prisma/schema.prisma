@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DotsStaff {
+  id            String            @id @default(uuid())
+  name          String
+  email         String            @unique
+  password      String
+  role          String            @default("staff")
+  facilityId    String?
+  createdAt     DateTime          @default(now())
+  appointments  Appointment[]
+  facility      Facility?         @relation(fields: [facilityId], references: [id])
+  notifications NotificationLog[]
+  patients      Patient[]
+
+  @@map("dots_staff")
+}
+
+model Patient {
+  id                 String        @id @default(uuid())
+  name               String
+  phone              String        @unique
+  age                Int
+  sex                String
+  address            String
+  diagnosis          String
+  hasWhatsApp        Boolean       @default(true)
+  staffId            String
+  facilityId         String
+  createdAt          DateTime      @default(now())
+  nextRefillDate     DateTime?
+  status             String        @default("ACTIVE")
+  treatmentStartDate DateTime      @default(now())
+  extrapulmonarySite String?
+  patientType        PatientType   @default(NEW)
+  appointments       Appointment[]
+  facility           Facility      @relation(fields: [facilityId], references: [id])
+  staff              DotsStaff     @relation(fields: [staffId], references: [id])
+
+  @@map("patients")
+}
+
+model Appointment {
+  id          String    @id @default(uuid())
+  patientId   String
+  staffId     String
+  scheduledAt DateTime
+  status      String    @default("scheduled")
+  createdAt   DateTime  @default(now())
+  type        String    @default("REFILL")
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  staff       DotsStaff @relation(fields: [staffId], references: [id])
+
+  @@map("appointments")
+}
+
+model NotificationLog {
+  id        String     @id @default(uuid())
+  recipient String
+  channel   String
+  status    String
+  type      String
+  sentAt    DateTime   @default(now())
+  staffId   String?
+  staff     DotsStaff? @relation(fields: [staffId], references: [id])
+
+  @@map("notification_logs")
+}
+
+model Facility {
+  id       String      @id @default(uuid())
+  name     String      @unique
+  staff    DotsStaff[]
+  patients Patient[]
+
+  @@map("facilities")
+}
+
+enum PatientType {
+  NEW
+  RETREATMENT
+}
+
+enum Sex {
+  Male
+  Female
+}

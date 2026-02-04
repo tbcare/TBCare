@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "types": ["node"], // 👈 Explicitly include Node types
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*", "src/*"]
+    },
+    "rootDir": "./", // 👈 Change from "./src" to "./" to include the prisma folder
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "noImplicitAny": false, 
+    "sourceMap": true
+  },
+  "include": ["src/**/*", "prisma/**/*"], // 👈 Add prisma folder here
+  "exclude": ["node_modules"]
+}
