@@ -13,7 +13,6 @@ import DashboardLayout from './layouts/DashboardLayout';
 
 /**
  * Higher-order component to protect private clinical routes.
- * Checks for an auth token in localStorage before allowing access.
  */
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('token');
@@ -27,15 +26,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <Router>
+    /* --- UPDATED: Added Future Flags to remove console warnings --- */
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         {/* --- Public Authentication --- */}
         <Route path="/login" element={<LoginPage />} />
 
         {/* --- Protected Clinical Routes --- */}
-        {/* All routes below are wrapped in ProtectedRoute and DashboardLayout */}
-        
-        {/* Main Dashboard Analytics */}
         <Route 
           path="/dashboard" 
           element={
@@ -47,7 +44,6 @@ function App() {
           } 
         />
 
-        {/* Full Patient Registry */}
         <Route 
           path="/patients" 
           element={
@@ -59,7 +55,6 @@ function App() {
           } 
         />
 
-        {/* New Patient Enrollment */}
         <Route 
           path="/add-patient" 
           element={
@@ -71,10 +66,6 @@ function App() {
           } 
         />
 
-        {/* Patient Detail & Inline Management
-            Note: We no longer use a separate /edit route. 
-            Editing is handled via state inside PatientProfile.
-        */}
         <Route 
           path="/patients/:id" 
           element={
@@ -87,7 +78,6 @@ function App() {
         />
 
         {/* --- Global Navigation Logic --- */}
-        {/* Redirect empty paths and 404s to the Dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -1,11 +1,11 @@
 import axios from 'axios';
 
-// Use GitHub Codespaces forwarded URL for backend
 const api = axios.create({
-  baseURL: 'https://special-waffle-qrq4756xgrghxq47-5000.app.github.dev/api',
+  // FIX: Add /api to the end of your local URL
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
 });
 
-// Automatically add the JWT token to every request from localStorage
+// Automatically add the JWT token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
