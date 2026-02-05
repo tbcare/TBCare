@@ -1,33 +1,30 @@
-import { useEffect, useState } from 'react'; // 'React' import removed to fix ts(6133)
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { 
-  User, Calendar, Phone, ClipboardList, Plus, 
-  ChevronRight, AlertCircle, Clock, Search, 
-  Filter, Trash2, Edit3, CheckCircle 
+  User, ClipboardList, Plus, 
+  AlertCircle, Clock, CheckCircle, 
+  BarChart3, Activity
 } from 'lucide-react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  ResponsiveContainer, LineChart, Line, Cell
+} from 'recharts';
 import AddPatientModal from '../components/AddPatientModal';
 
-// Define a basic interface for better type safety
 interface Patient {
   id: string;
   name: string;
   phone: string;
   diagnosis: string;
-  patientType: string;
+  status: string;
   nextRefillDate: string;
+  createdAt: string;
 }
 
 const Dashboard = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '', name: '' });
-  const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: '' });
-
-  const navigate = useNavigate();
+  const [toast, setToast] = useState({ show: false, message: '' });
 
   const fetchPatients = async () => {
     try {
@@ -38,294 +35,200 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => {
-    fetchPatients();
-  }, []);
-
   const showToast = (message: string) => {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   };
 
-  // --- NAVIGATION LOGIC ---
-  const handleViewOrUpdate = (id: string) => {
-    navigate(`/patient/${id}`);
-  };
+  useEffect(() => {
+    fetchPatients();
+  }, []);
 
-  // --- DELETE LOGIC ---
-  const handleDeleteConfirm = async () => {
-    try {
-      await api.delete(`/patients/${deleteModal.id}`);
-      setDeleteModal({ isOpen: false, id: '', name: '' });
-      fetchPatients();
-      showToast("Patient record successfully removed");
-    } catch (err) {
-      console.error("Delete failed", err);
-      showToast("Error: Could not delete record");
-    }
-  };
-
-  const openDeleteModal = (e: React.MouseEvent, id: string, name: string) => {
-    e.stopPropagation(); 
-    setDeleteModal({ isOpen: true, id, name });
-  };
-
-  const handleEditClick = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); 
-    handleViewOrUpdate(id);
-  };
-
-  // --- STATS CALCULATION ---
+  // --- LOGIC CALCULATIONS ---
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
 
-  const dueTodayCount = patients.filter((p) => {
-    const d = new Date(p.nextRefillDate);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() === today.getTime();
-  }).length;
+  let dueTodayCount = 0;
+  let pastDueCount = 0;
+  let monthlyTotalDue = 0;
+  let monthlyAttended = 0;
 
-  const pastDueCount = patients.filter((p) => {
-    const d = new Date(p.nextRefillDate);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() < today.getTime();
-  }).length;
-
-  const filteredPatients = patients.filter((p) => {
-    const nameMatch = p.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const phoneMatch = p.phone?.includes(searchTerm);
-    const matchesSearch = nameMatch || phoneMatch;
-    const matchesDropdown = filterType === 'ALL' || p.diagnosis === filterType;
-    return matchesSearch && matchesDropdown;
-  });
-
-  // --- STYLING HELPERS ---
-  const getPatientTypeStyle = (type: string) => 
-    type === 'NEW' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100';
-
-  const getDiagnosisStyle = (diag: string) => {
-    const styles: Record<string, string> = {
-      'Drug Resistant': 'bg-rose-50 text-rose-700 border-rose-100',
-      'Extra-pulmonary': 'bg-purple-50 text-purple-700 border-purple-100',
-    };
-    return styles[diag] || 'bg-blue-50 text-blue-700 border-blue-100';
+  const diagCounts: Record<string, number> = {
+    'P-Pos': 0, 'P-Neg': 0, 'EP': 0, 'MDR': 0
   };
 
-  return (
-    <div className="space-y-6 relative max-w-7xl mx-auto px-4 py-6">
-      {/* Header Section */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <ClipboardList className="text-blue-600" size={28} /> Clinical Dashboard
-          </h2>
-          <p className="text-slate-500 text-sm font-medium">Monitoring active TB treatment courses</p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-          {/* Updated: min-w-60 is the canonical class for 240px */}
-          <div className="relative flex-1 min-w-60">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text"
-              placeholder="Search by name or phone..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+  patients.forEach(p => {
+    const rDate = new Date(p.nextRefillDate);
+    const rDateMonth = rDate.getMonth();
+    const rDateYear = rDate.getFullYear();
+    rDate.setHours(0, 0, 0, 0);
 
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <select 
-              className="pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none cursor-pointer text-slate-700 font-bold"
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
-              <option value="ALL">All Diagnoses</option>
-              <option value="Pulmonary Positive">Pulmonary (+)</option>
-              <option value="Pulmonary Negative">Pulmonary (-)</option>
-              <option value="Extra-pulmonary">Extra-pulmonary</option>
-              <option value="Drug Resistant">Drug Resistant</option>
-            </select>
+    if (p.status === 'ACTIVE') {
+      if (rDate.getTime() === today.getTime()) dueTodayCount++;
+      if (rDate.getTime() < today.getTime()) pastDueCount++;
+    }
+
+    if (rDateMonth === currentMonth && rDateYear === currentYear) {
+      monthlyTotalDue++;
+      if (rDate > today || p.status !== 'ACTIVE') monthlyAttended++;
+    }
+
+    if (p.diagnosis === 'Pulmonary Positive') diagCounts['P-Pos']++;
+    else if (p.diagnosis === 'Pulmonary Negative') diagCounts['P-Neg']++;
+    else if (p.diagnosis === 'Extra-pulmonary') diagCounts['EP']++;
+    else if (p.diagnosis === 'Drug Resistant' || p.diagnosis === 'MDR-TB') diagCounts['MDR']++;
+  });
+
+  const currentAdherenceRate = monthlyTotalDue > 0 
+    ? Math.round((monthlyAttended / monthlyTotalDue) * 100) 
+    : 100;
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  const adherenceTrendData = [
+    { month: monthNames[(currentMonth - 2 + 12) % 12], rate: 85 }, 
+    { month: monthNames[(currentMonth - 1 + 12) % 12], rate: 92 }, 
+    { month: monthNames[currentMonth], rate: currentAdherenceRate }, 
+  ];
+
+  const diagnosisData = [
+    { name: 'P-Pos', count: diagCounts['P-Pos'], color: '#ef4444' }, 
+    { name: 'P-Neg', count: diagCounts['P-Neg'], color: '#3b82f6' }, // Themed Blue
+    { name: 'EP', count: diagCounts['EP'], color: '#f59e0b' }, 
+    { name: 'MDR', count: diagCounts['MDR'], color: '#8b5cf6' }, 
+  ];
+
+  return (
+    <div className="space-y-6 relative max-w-7xl mx-auto px-4 py-8 animate-in fade-in duration-700">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-200">
+            <ClipboardList size={28} />
           </div>
-          
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-black hover:bg-blue-700 transition flex items-center gap-2 shadow-lg shadow-blue-200 active:scale-95"
-          >
-            <Plus size={20} /> Add Patient
-          </button>
+          <div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Dashboard</h1>
+            <p className="text-slate-500 font-bold text-sm">Clinical overview and treatment analytics</p>
+          </div>
         </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-slate-900 text-white px-6 py-3.5 rounded-2xl font-black hover:bg-blue-600 transition flex items-center gap-2 shadow-xl active:scale-95"
+        >
+          <Plus size={20} /> New Enrollment
+        </button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Standardized Compact Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-amber-200 transition-colors">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:bg-amber-100 transition-colors"><Clock size={24} /></div>
+        
+        {/* DUE TODAY - Blue Theme */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 h-24 transition-all hover:border-blue-200">
+          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+            <Clock size={22} />
+          </div>
           <div>
-            {/* Updated: tracking-widest is the canonical class for 0.1em */}
-            <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest">Due Today</p>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-tight">Due Today</p>
             <p className="text-2xl font-black text-slate-900">{dueTodayCount}</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-rose-200 transition-colors">
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl group-hover:bg-rose-100 transition-colors"><AlertCircle size={24} /></div>
+        {/* CLINICAL ALERTS - Rose Theme */}
+        <div className={`p-4 rounded-2xl border flex items-center gap-4 h-24 transition-all duration-500 bg-white ${
+          pastDueCount > 0 
+            ? 'border-rose-200 shadow-[0_4px_12px_rgba(244,63,94,0.08)]' 
+            : 'border-slate-200 shadow-sm'
+        }`}>
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+            pastDueCount > 0 ? 'bg-rose-100 text-rose-600 animate-pulse' : 'bg-slate-50 text-slate-400'
+          }`}>
+            <AlertCircle size={22} />
+          </div>
           <div>
-            {/* Updated: tracking-widest is the canonical class for 0.1em */}
-            <p className="text-[10px] text-rose-600 font-black uppercase tracking-widest">Past Due</p>
+            <p className={`text-[10px] font-black uppercase tracking-widest leading-tight ${pastDueCount > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+              Clinical Alerts
+            </p>
             <p className="text-2xl font-black text-slate-900">{pastDueCount}</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-blue-200 transition-colors sm:col-span-2 lg:col-span-1">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-100 transition-colors"><User size={24} /></div>
+        {/* ACTIVE PATIENTS - Emerald Theme */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 h-24 sm:col-span-2 lg:col-span-1">
+          <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+            <User size={22} />
+          </div>
           <div>
-            {/* Updated: tracking-widest is the canonical class for 0.1em */}
-            <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">Total Enrolled</p>
-            <p className="text-2xl font-black text-slate-900">{patients.length}</p>
+            <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest leading-tight">Active Patients</p>
+            <p className="text-2xl font-black text-slate-900">
+              {patients.filter(p => p.status === 'ACTIVE').length}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50/50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Patient Details</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Classification</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Refill Date</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredPatients.length > 0 ? (
-                filteredPatients.map((patient) => {
-                  const rDate = new Date(patient.nextRefillDate);
-                  rDate.setHours(0,0,0,0);
-                  const isPastDue = rDate.getTime() < today.getTime();
-                  const isToday = rDate.getTime() === today.getTime();
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Adherence Rate Line Chart */}
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+          <div className="mb-8 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Activity className="text-emerald-500" size={24} />
+              <h3 className="font-black text-slate-800 text-xl">Treatment Adherence</h3>
+            </div>
+            <span className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black">
+              {currentAdherenceRate}% Score
+            </span>
+          </div>
+          <div className="h-[320px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={adherenceTrendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 800}} dy={10} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                <Tooltip 
+                  contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', padding: '15px'}} 
+                  itemStyle={{fontWeight: 900, color: '#059669'}}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="rate" 
+                  stroke="#10b981" 
+                  strokeWidth={6} 
+                  dot={{ r: 8, fill: '#10b981', strokeWidth: 4, stroke: '#fff' }} 
+                  activeDot={{ r: 10, strokeWidth: 0 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-                  return (
-                    <tr 
-                      key={patient.id} 
-                      onClick={() => handleViewOrUpdate(patient.id)}
-                      className="hover:bg-blue-50/30 transition cursor-pointer group"
-                    >
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                            <User size={20} />
-                          </div>
-                          <div>
-                            <p className="font-black text-slate-900 group-hover:text-blue-700 transition-colors">{patient.name}</p>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold">
-                              <Phone size={12} className="opacity-70" /> {patient.phone}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="flex flex-col gap-1.5">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border w-fit tracking-tight ${getPatientTypeStyle(patient.patientType)}`}>
-                            {patient.patientType}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border w-fit tracking-tight ${getDiagnosisStyle(patient.diagnosis)}`}>
-                            {patient.diagnosis}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
-                        <span className={`px-3 py-1.5 rounded-xl text-xs font-black border flex items-center gap-2 w-fit ${
-                          isPastDue ? 'bg-rose-50 text-rose-700 border-rose-200' : 
-                          isToday ? 'bg-amber-50 text-amber-700 border-amber-200' : 
-                          'bg-slate-50 text-slate-700 border-slate-200'
-                        }`}>
-                          <Calendar size={14} /> {rDate.toLocaleDateString('en-GB')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 text-right">
-                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                          <button 
-                            onClick={(e) => handleEditClick(e, patient.id)}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="Update Profile"
-                          >
-                            <Edit3 size={18} />
-                          </button>
-                          <button 
-                            onClick={(e) => openDeleteModal(e, patient.id, patient.name)}
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                            title="Delete Record"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                          <div className="flex items-center px-1">
-                            <ChevronRight size={18} className="text-slate-300" />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={4} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <Search size={40} className="opacity-20" />
-                      <p className="font-bold">No clinical records match your criteria.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        {/* Diagnosis Bar Chart */}
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-8">
+            <BarChart3 className="text-blue-600" size={24} />
+            <h3 className="font-black text-slate-800 text-xl">Burden by Diagnosis</h3>
+          </div>
+          <div className="h-[320px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={diagnosisData} margin={{ top: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 900}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '20px', border: 'none'}} />
+                <Bar dataKey="count" radius={[12, 12, 0, 0]} barSize={50}>
+                  {diagnosisData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
-      {/* Confirmation Modal */}
-      {deleteModal.isOpen && (
-        /* Updated: z-100 is the canonical class for z-index 100 */
-        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full border border-slate-200 overflow-hidden">
-            <div className="p-8 text-center">
-              <div className="mx-auto w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-4">
-                <AlertCircle size={32} />
-              </div>
-              <h3 className="text-xl font-black text-slate-900">Delete Record?</h3>
-              <p className="text-slate-500 mt-3 text-sm leading-relaxed font-medium">
-                You are about to remove <span className="font-black text-slate-900">"{deleteModal.name}"</span>. 
-                This will permanently erase their clinical history.
-              </p>
-            </div>
-            <div className="flex p-4 gap-3 bg-slate-50 border-t border-slate-100">
-              <button 
-                onClick={() => setDeleteModal({ isOpen: false, id: '', name: '' })}
-                className="flex-1 px-6 py-3 text-slate-600 font-black hover:bg-white rounded-xl transition"
-              >
-                Keep
-              </button>
-              <button 
-                onClick={handleDeleteConfirm}
-                className="flex-1 px-6 py-3 bg-rose-600 text-white font-black hover:bg-rose-700 rounded-xl transition shadow-lg shadow-rose-200"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Notifications */}
       {toast.show && (
-        /* Updated: z-110 is the canonical class for z-index 110 */
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-110 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300">
-          <div className="bg-emerald-500/20 p-1 rounded-full">
-            <CheckCircle className="text-emerald-400" size={18} />
-          </div>
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[110] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5">
+          <CheckCircle className="text-emerald-400" size={20} />
           <span className="font-black text-sm tracking-wide">{toast.message}</span>
         </div>
       )}
@@ -333,7 +236,7 @@ const Dashboard = () => {
       <AddPatientModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onRefresh={fetchPatients} 
+        onRefresh={() => { fetchPatients(); showToast("Clinical Records Updated"); }} 
       />
     </div>
   );

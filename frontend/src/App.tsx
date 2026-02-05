@@ -1,5 +1,4 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 // Core Page Imports
 import LoginPage from './pages/LoginPage';
@@ -12,72 +11,32 @@ import PatientProfile from './pages/PatientProfile';
 import DashboardLayout from './layouts/DashboardLayout';
 
 /**
- * Higher-order component to protect private clinical routes.
+ * Optimized Protected Route
  */
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute = () => {
   const token = localStorage.getItem('token');
-  
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
+  return token ? <Outlet /> : <Navigate to="/login" replace />;
 };
 
 function App() {
   return (
-    /* --- UPDATED: Added Future Flags to remove console warnings --- */
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
-        {/* --- Public Authentication --- */}
+        {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* --- Protected Clinical Routes --- */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <Dashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          } 
-        />
+        {/* Protected Group */}
+        <Route element={<ProtectedRoute />}>
+          {/* Layout Group */}
+          <Route element={<DashboardLayout children={<Outlet />} />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/patients" element={<PatientList />} />
+            <Route path="/add-patient" element={<AddPatient />} />
+            <Route path="/patients/:id" element={<PatientProfile />} />
+          </Route>
+        </Route>
 
-        <Route 
-          path="/patients" 
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <PatientList /> 
-              </DashboardLayout>
-            </ProtectedRoute>
-          } 
-        />
-
-        <Route 
-          path="/add-patient" 
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <AddPatient />
-              </DashboardLayout>
-            </ProtectedRoute>
-          } 
-        />
-
-        <Route 
-          path="/patients/:id" 
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <PatientProfile />
-              </DashboardLayout>
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* --- Global Navigation Logic --- */}
+        {/* Global Redirects */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

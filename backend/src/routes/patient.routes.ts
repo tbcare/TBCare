@@ -1,20 +1,31 @@
 import { Router } from 'express';
 import { authenticateJWT } from '../middleware/auth.middleware';
-import { registerPatient, getAllPatients } from '../controllers/patient.controller';
+import { 
+  registerPatient, 
+  getAllPatients, 
+  getPatientById,    // Add this
+  updatePatient,     // Add this
+  deletePatient      // Add this
+} from '../controllers/patient.controller';
 import { validatePatient } from '../middleware/validate.middleware';
 
 const router = Router();
 
-// --- DEBUG LOGS (Delete these after it works) ---
-console.log('Is registerPatient a function?', typeof registerPatient);
-console.log('Is validatePatient a function?', typeof validatePatient);
-console.log('Is authenticateJWT a function?', typeof authenticateJWT);
-
-// GET: /api/patients
+// 1. GET ALL: /api/patients
 router.get('/', authenticateJWT, getAllPatients);
 
-// POST: /api/patients
-// The order MUST be: 1. Auth -> 2. Validate -> 3. Controller
+// 2. GET SINGLE: /api/patients/:id
+// This is the route your PatientProfile component is looking for!
+router.get('/:id', authenticateJWT, getPatientById);
+
+// 3. POST: /api/patients
 router.post('/', authenticateJWT, validatePatient, registerPatient);
+
+// 4. PUT: /api/patients/:id
+// Used for saving edits and logging refills
+router.put('/:id', authenticateJWT, updatePatient);
+
+// 5. DELETE: /api/patients/:id
+router.delete('/:id', authenticateJWT, deletePatient);
 
 export default router;
