@@ -179,7 +179,7 @@ const Dashboard = () => {
               {currentAdherenceRate}% Score
             </span>
           </div>
-          <div className="h-[320px] w-full">
+          <div className="h-[320px] w-full min-w-0 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={adherenceTrendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -208,7 +208,7 @@ const Dashboard = () => {
             <BarChart3 className="text-blue-600" size={24} />
             <h3 className="font-black text-slate-800 text-xl">Burden by Diagnosis</h3>
           </div>
-          <div className="h-[320px] w-full">
+          <div className="h-[320px] w-full min-w-0 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={diagnosisData} margin={{ top: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />

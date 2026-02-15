@@ -23,16 +23,21 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
       return res.status(401).json({ message: 'Authentication token missing' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret', (err, decoded) => {
+    const secret = process.env.JWT_SECRET || 'dev_fallback_secret_key';
+    console.log(`🔐 Verifying token... Secret: ${secret === 'tbcare_2026' ? 'tbcare_2026' : 'fallback'}`);
+    
+    jwt.verify(token, secret, (err, decoded) => {
       if (err) {
+        console.log(`❌ JWT Error: ${err.message}`);
         return res.status(403).json({ message: 'Token is invalid or expired' });
       }
 
+      console.log(`✅ Token verified for user: ${(decoded as any).id}`);
       // Attach the user info (id and role) to the request object
       req.user = decoded as AuthPayload;
       next(); // Move to the actual route
     });
   } else {
-    res.status(401).json({ message: 'Authorization header missing' });
+    return res.status(401).json({ message: 'Authorization header missing' });
   }
 };

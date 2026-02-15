@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { X, Loader2, MapPin, Activity, AlertCircle } from 'lucide-react';
+import { X, Loader2, MapPin, Activity, AlertCircle, CheckCircle } from 'lucide-react';
 import api from '../api/axios';
 
 const AddPatientModal = ({ isOpen, onClose, onRefresh }: any) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   const [formData, setFormData] = useState({
     name: '', 
@@ -28,22 +30,36 @@ const AddPatientModal = ({ isOpen, onClose, onRefresh }: any) => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
-      if (!user.id || !user.facilityId) {
+      if (!user.id) {
         throw new Error("Staff session expired. Please log in again.");
       }
+      
+      if (!user.facilityId) {
+        throw new Error("Facility information missing. Please log in again.");
+      }
 
-      const response = await api.post('/patients', {
-        ...formData,
+      const payload = {
+        name: formData.name,
+        phone: formData.phone,
+        age: formData.age,
+        sex: formData.sex,
+        address: formData.address,
+        diagnosis: formData.diagnosis,
+        extrapulmonarySite: formData.extrapulmonarySite,
+        patientType: formData.patientType,
+        treatmentStartDate: formData.treatmentStartDate,
         staffId: user.id,
         facilityId: user.facilityId
-      });
+      };
+
+      console.log('Submitting patient data:', payload);
+      
+      const response = await api.post('/patients', payload);
 
       // Safely extract the name from response
       const patientName = response.data?.name || response.data?.patient?.name || "Patient";
-
-      onRefresh();
-      onClose();
-      alert(`${patientName} enrolled successfully.`);
+      setSuccessMessage(`${patientName} enrolled successfully.`);
+      setShowSuccess(true);
       
       // Reset form
       setFormData({
@@ -51,11 +67,32 @@ const AddPatientModal = ({ isOpen, onClose, onRefresh }: any) => {
         diagnosis: 'Pulmonary Positive', extrapulmonarySite: '',
         patientType: 'NEW', treatmentStartDate: ''
       });
+      
+      // Refresh after a short delay
+      setTimeout(() => {
+        setShowSuccess(false);
+        onRefresh();
+        onClose();
+      }, 2000);
 
     } catch (err: any) {
-      const backendMessage = err.response?.data?.message || err.message || "Error adding patient record";
-      setError(backendMessage);
-      console.error("Enrollment Error:", err.response?.data || err);
+      console.error("Full error object:", err);
+      console.error("Error response:", err.response);
+      console.error("Error data:", err.response?.data);
+      
+      let errorMessage = "Error adding patient record";
+      
+      if (err.response?.status === 401) {
+        errorMessage = "Session expired. Please log in again.";
+      } else if (err.response?.status === 400) {
+        errorMessage = err.response?.data?.message || "Invalid patient data. Check all fields.";
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -203,6 +240,30 @@ const AddPatientModal = ({ isOpen, onClose, onRefresh }: any) => {
           </button>
         </form>
       </div>
+
+      {/* Success Modal */}
+      {showSuccess && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 animate-in fade-in zoom-in">
+            <div className="flex items-center justify-center mb-4">
+              <CheckCircle className="text-emerald-500" size={48} />
+            </div>
+            
+            <h2 className="text-xl font-bold text-center text-slate-900 mb-2">Success!</h2>
+            
+            <p className="text-slate-600 text-center mb-6">
+              {successMessage}
+            </p>
+            
+            <button
+              onClick={() => setShowSuccess(false)}
+              className="w-full px-4 py-3 font-bold rounded-lg transition-all bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

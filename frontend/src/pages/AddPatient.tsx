@@ -14,7 +14,7 @@ import {
 const AddPatient = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<{ show: boolean, message: string, type: 'success' | 'error' }>({
+  const [modal, setModal] = useState<{ show: boolean, message: string, type: 'success' | 'error' }>({
     show: false,
     message: '',
     type: 'success'
@@ -28,9 +28,12 @@ const AddPatient = () => {
     nextRefillDate: new Date().toISOString().split('T')[0]
   });
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  const showModal = (message: string, type: 'success' | 'error') => {
+    setModal({ show: true, message, type });
+  };
+
+  const closeModal = () => {
+    setModal({ show: false, message: '', type: 'success' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,12 +41,10 @@ const AddPatient = () => {
     setLoading(true);
     try {
       await api.post('/patients', formData);
-      showToast("Patient enrolled successfully!", "success");
-      // Delay navigation slightly so user sees the success state
-      setTimeout(() => navigate('/patients'), 1500);
+      showModal("Patient enrolled successfully!", "success");
     } catch (err) {
       console.error("Enrollment failed", err);
-      showToast("Failed to enroll patient. Please check your connection.", "error");
+      showModal("Failed to enroll patient. Please check your connection.", "error");
     } finally {
       setLoading(false);
     }
@@ -173,13 +174,44 @@ const AddPatient = () => {
         </form>
       </div>
 
-      {/* Toast Feedback */}
-      {toast.show && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-black animate-in slide-in-from-bottom-5 duration-300 ${
-          toast.type === 'success' ? 'bg-slate-900' : 'bg-rose-600'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle className="text-emerald-400" size={20} /> : <AlertCircle size={20} />}
-          {toast.message}
+      {/* Modal Popup Feedback */}
+      {modal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 animate-in fade-in zoom-in">
+            <div className="flex items-center justify-center mb-4">
+              {modal.type === 'success' ? (
+                <CheckCircle className="text-emerald-500" size={48} />
+              ) : (
+                <AlertCircle className="text-red-500" size={48} />
+              )}
+            </div>
+            
+            <h2 className={`text-xl font-bold text-center mb-2 ${
+              modal.type === 'success' ? 'text-slate-900' : 'text-red-600'
+            }`}>
+              {modal.type === 'success' ? 'Success!' : 'Error'}
+            </h2>
+            
+            <p className="text-slate-600 text-center mb-6">
+              {modal.message}
+            </p>
+            
+            <button
+              onClick={() => {
+                closeModal();
+                if (modal.type === 'success') {
+                  navigate('/patients');
+                }
+              }}
+              className={`w-full px-4 py-3 font-bold rounded-lg transition-all ${
+                modal.type === 'success'
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              OK
+            </button>
+          </div>
         </div>
       )}
     </div>

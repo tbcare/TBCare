@@ -34,9 +34,14 @@ const PatientProfile = () => {
       const data = response.data;
       setPatient(data);
       setEditForm(data); 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Fetch Error:", err);
       setPatient(null);
+      if (err.response?.status === 404) {
+        showToast("Patient record not found. Please check the patient ID.", "error");
+      } else {
+        showToast("Failed to load patient details.", "error");
+      }
     } finally {
       setLoading(false);
     }
